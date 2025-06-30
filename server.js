@@ -47,20 +47,30 @@ app.post('/api/messages/send', async (req, res) => {
 app.get('/api/messages/:channel/:ts', async (req, res) => {
   try {
     const { channel, ts } = req.params;
+    let allMessages = [];
+    let cursor;
 
-    const result = await slackClient.conversations.history({
-      channel,
-      latest: ts,
-      inclusive: true,
-      limit: 1,
-    });
+    do {
+      const response = await slackClient.conversations.history({
+        channel,
+        latest: ts,
+        inclusive: false,
+        limit: 200, // Max per Slack docs
+        cursor
+      });
 
-    res.json({ success: true, data: result.messages[0] || null });
+      allMessages.push(...response.messages);
+      cursor = response.response_metadata?.next_cursor;
+    } while (cursor);
+
+    res.json({ success: true, messages: allMessages });
   } catch (error) {
-    console.error('Error fetching message:', error);
+    console.error('Error fetching messages with pagination:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+
 
 // ✅ Update immediate message
 app.put('/api/messages/update', async (req, res) => {
